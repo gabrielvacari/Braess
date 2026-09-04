@@ -30,9 +30,9 @@ Single Go module, idiomatic layout (see plan.md "Structure Decision"):
 
 **Purpose**: Project initialization
 
-- [ ] T001 Create `go.mod` at repo root (`module braess`, `go 1.26`)
-- [ ] T002 [P] Create the directory skeleton `graph/` and `cmd/graphcli/` per plan.md's Project Structure
-- [ ] T003 [P] Add Go build artifacts (e.g. a compiled `graphcli` binary) to root `.gitignore`
+- [X] T001 Create `go.mod` at repo root (`module braess`, `go 1.26`)
+- [X] T002 [P] Create the directory skeleton `graph/` and `cmd/graphcli/` per plan.md's Project Structure
+- [X] T003 [P] Add Go build artifacts (e.g. a compiled `graphcli` binary) to root `.gitignore`
 
 ---
 
@@ -42,10 +42,10 @@ Single Go module, idiomatic layout (see plan.md "Structure Decision"):
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T004 [P] Define `NodeType` enum and `Node` struct in `graph/node.go` (data-model.md "NodeType", "Node")
-- [ ] T005 [P] Define the `TravelTimeFunc` type in `graph/traveltime.go` (contracts/graph-api.md)
-- [ ] T006 [P] Define the `Edge` struct in `graph/edge.go`, referencing `TravelTimeFunc` (data-model.md "Edge (Road)")
-- [ ] T007 Define the `Graph` struct (internal `nodes`/`edges` maps) and `New()` constructor in `graph/graph.go` (depends on T004, T006)
+- [X] T004 [P] Define `NodeType` enum and `Node` struct in `graph/node.go` (data-model.md "NodeType", "Node")
+- [X] T005 [P] Define the `TravelTimeFunc` type in `graph/traveltime.go` (contracts/graph-api.md)
+- [X] T006 [P] Define the `Edge` struct in `graph/edge.go`, referencing `TravelTimeFunc` (data-model.md "Edge (Road)")
+- [X] T007 Define the `Graph` struct (internal `nodes`/`edges` maps) and `New()` constructor in `graph/graph.go` (depends on T004, T006)
 
 **Checkpoint**: Foundation ready — user story implementation can now begin
 
@@ -61,13 +61,13 @@ logic, or UI involved.
 
 ### Implementation for User Story 1
 
-- [ ] T008 [P] [US1] Implement `Graph.AddNode` in `graph/graph.go` (FR-001; rejects empty or duplicate node IDs)
-- [ ] T009 [US1] Implement `Graph.AddEdge` in `graph/graph.go` (FR-002, FR-003, FR-005; depends on T008 — validates `From`/`To` exist, allows parallel edges between the same pair, rejects empty/duplicate edge IDs)
-- [ ] T010 [US1] Implement `Graph.Nodes()` and `Graph.Edges()` enumeration in `graph/graph.go` (FR-007; depends on T008, T009)
+- [X] T008 [P] [US1] Implement `Graph.AddNode` in `graph/graph.go` (FR-001; rejects empty or duplicate node IDs)
+- [X] T009 [US1] Implement `Graph.AddEdge` in `graph/graph.go` (FR-002, FR-003, FR-005; depends on T008 — validates `From`/`To` exist, allows parallel edges between the same pair, rejects empty/duplicate edge IDs)
+- [X] T010 [US1] Implement `Graph.Nodes()` and `Graph.Edges()` enumeration in `graph/graph.go` (FR-007; depends on T008, T009)
 
 ### Tests for User Story 1
 
-- [ ] T011 [P] [US1] Table-driven tests for `AddNode`/`AddEdge`/`Nodes`/`Edges` in `graph/graph_test.go`, covering spec Acceptance Scenarios 1-2 and the "unknown node reference" and "parallel edges" Edge Cases (depends on T008-T010)
+- [X] T011 [P] [US1] Table-driven tests for `AddNode`/`AddEdge`/`Nodes`/`Edges` in `graph/graph_test.go`, covering spec Acceptance Scenarios 1-2 and the "unknown node reference" and "parallel edges" Edge Cases (depends on T008-T010)
 
 **Checkpoint**: `go test ./graph/...` passes for graph construction — User Story 1 is independently functional and testable.
 
@@ -84,12 +84,12 @@ or UI involved.
 
 ### Implementation for User Story 2
 
-- [ ] T012 [P] [US2] Implement `Linear` and `Constant` `TravelTimeFunc` constructors in `graph/traveltime.go` (research.md decision #2)
-- [ ] T013 [US2] Implement `Graph.TravelTime(edgeID, volume)` in `graph/graph.go` (FR-004, FR-008; depends on T009 for edge lookup and T012 for the functions it evaluates)
+- [X] T012 [P] [US2] Implement `Linear` and `Constant` `TravelTimeFunc` constructors in `graph/traveltime.go` (research.md decision #2)
+- [X] T013 [US2] Implement `Graph.TravelTime(edgeID, volume)` in `graph/graph.go` (FR-004, FR-008; depends on T009 for edge lookup and T012 for the functions it evaluates)
 
 ### Tests for User Story 2
 
-- [ ] T014 [P] [US2] Table-driven tests for `Linear`, `Constant`, and `Graph.TravelTime` in `graph/traveltime_test.go`, covering SC-002 (free-flow time at volume 0), SC-003 (non-decreasing across ≥5 increasing volume samples), and FR-008 (negative volume returns an error) (depends on T012, T013)
+- [X] T014 [P] [US2] Table-driven tests for `Linear`, `Constant`, and `Graph.TravelTime` in `graph/traveltime_test.go`, covering SC-002 (free-flow time at volume 0), SC-003 (non-decreasing across ≥5 increasing volume samples), and FR-008 (negative volume returns an error) (depends on T012, T013)
 
 **Checkpoint**: `go test ./graph/...` now covers both graph construction and travel-time behavior — User Stories 1 and 2 both independently pass.
 
@@ -105,11 +105,11 @@ code — no browser or UI required.
 
 ### Implementation for User Story 3
 
-- [ ] T015 [US3] Implement `cmd/graphcli/main.go`: build a sample network (≥4 nodes mixing `NodeType`s, ≥4 edges mixing `Linear`/`Constant` travel-time functions) and print every node's ID/type and every edge's endpoints/length/capacity/current travel time to stdout (FR-006; depends on T008, T009, T010, T012, T013)
+- [X] T015 [US3] Implement `cmd/graphcli/main.go`: build a sample network (≥4 nodes mixing `NodeType`s, ≥4 edges mixing `Linear`/`Constant` travel-time functions) and print every node's ID/type and every edge's endpoints/length/capacity/current travel time to stdout (FR-006; depends on T008, T009, T010, T012, T013)
 
 ### Validation for User Story 3
 
-- [ ] T016 [US3] Run `go run ./cmd/graphcli` per quickstart.md and confirm the printed output and a `0` exit code (SC-001) (depends on T015)
+- [X] T016 [US3] Run `go run ./cmd/graphcli` per quickstart.md and confirm the printed output and a `0` exit code (SC-001) (depends on T015)
 
 **Checkpoint**: All three user stories are independently functional — the engine is complete for roadmap Phase 1.
 
@@ -119,9 +119,9 @@ code — no browser or UI required.
 
 **Purpose**: Whole-engine checks that span every story
 
-- [ ] T017 [P] Run `gofmt -l .` and `go vet ./...` across `graph/` and `cmd/graphcli/`; fix any findings
-- [ ] T018 Run the full quickstart.md validation end-to-end (`go test ./...` then `go run ./cmd/graphcli`) (depends on T011, T014, T016)
-- [ ] T019 [P] Add a package doc comment to `graph/graph.go` and `cmd/graphcli/main.go` stating each package's scope, noting that `graph` has zero UI dependency (constitution Principle I)
+- [X] T017 [P] Run `gofmt -l .` and `go vet ./...` across `graph/` and `cmd/graphcli/`; fix any findings
+- [X] T018 Run the full quickstart.md validation end-to-end (`go test ./...` then `go run ./cmd/graphcli`) (depends on T011, T014, T016)
+- [X] T019 [P] Add a package doc comment to `graph/graph.go` and `cmd/graphcli/main.go` stating each package's scope, noting that `graph` has zero UI dependency (constitution Principle I)
 
 ---
 

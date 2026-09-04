@@ -3,3 +3,9 @@
 
 # Claude Code local state (may contain local permission grants/session data)
 .claude/settings.local.json
+
+# Go build artifacts
+*.exe
+*.test
+*.out
+/graphcli
