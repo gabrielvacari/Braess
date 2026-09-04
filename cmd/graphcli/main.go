@@ -1,14 +1,25 @@
 // Command graphcli builds a small sample road network with the graph
-// engine and prints its full structure to standard output. It exists to
-// prove, per constitution Principle I and IV, that the engine works and is
-// verifiable in text — completely standalone, with zero UI dependency.
+// engine, routes a few agents across it, and prints the full result to
+// standard output. It exists to prove, per constitution Principle I and
+// IV, that the engine and its agents work and are verifiable in text —
+// completely standalone, with zero UI dependency.
 package main
 
 import (
 	"fmt"
 	"os"
 
+	"braess/agent"
 	"braess/graph"
+)
+
+// fixedOrigin and fixedDestination are this roadmap phase's one
+// externally-fixed origin/destination pair (spec 002-shortest-path-agents
+// Assumptions) — multiple distinct houses/companies arrive in Phase 4.
+const (
+	fixedOrigin      = "house-1"
+	fixedDestination = "company-2"
+	simulatedAgents  = 3
 )
 
 func main() {
@@ -26,6 +37,28 @@ func run() error {
 
 	printNodes(g)
 	printEdges(g)
+	return printAgentRoutes(g)
+}
+
+// printAgentRoutes constructs several independent agents for the fixed
+// origin/destination pair and prints each one's route. Each Agent value
+// is separate and calls ComputeRoute itself — nothing here computes one
+// route and copies it to the others (constitution Principle III, FR-003).
+func printAgentRoutes(g *graph.Graph) error {
+	fmt.Printf("Agents (%s -> %s):\n", fixedOrigin, fixedDestination)
+	for i := 1; i <= simulatedAgents; i++ {
+		a := &agent.Agent{Origin: fixedOrigin, Destination: fixedDestination}
+		route, err := a.ComputeRoute(g)
+		if err != nil {
+			return fmt.Errorf("agent %d: computing route: %w", i, err)
+		}
+
+		fmt.Printf("  agent-%d: %s", i, fixedOrigin)
+		for _, e := range route.Edges {
+			fmt.Printf(" -[%s]-> %s", e.ID, e.To)
+		}
+		fmt.Printf(" (total_travel_time=%g)\n", route.TotalTravelTime)
+	}
 	return nil
 }
 

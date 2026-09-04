@@ -29,7 +29,7 @@ New package `agent/` (depends only on `graph` + stdlib, per plan.md's
 
 ## Phase 1: Setup
 
-- [ ] T001 [P] Create the `agent/` package directory per plan.md's Project Structure
+- [X] T001 [P] Create the `agent/` package directory per plan.md's Project Structure
 
 ---
 
@@ -39,8 +39,8 @@ New package `agent/` (depends only on `graph` + stdlib, per plan.md's
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T002 [P] Define the `Route` struct (`Edges []graph.Edge`, `TotalTravelTime float64`) in `agent/route.go` (data-model.md "Route")
-- [ ] T003 [P] Define the `ErrNoRoute` sentinel error in `agent/shortestpath.go` (contracts/agent-api.md)
+- [X] T002 [P] Define the `Route` struct (`Edges []graph.Edge`, `TotalTravelTime float64`) in `agent/route.go` (data-model.md "Route")
+- [X] T003 [P] Define the `ErrNoRoute` sentinel error in `agent/shortestpath.go` (contracts/agent-api.md)
 
 **Checkpoint**: Foundation ready — user story implementation can now begin
 
@@ -57,11 +57,11 @@ path and check `ShortestRoute`'s result matches it, via `go test
 
 ### Implementation for User Story 1
 
-- [ ] T004 [US1] Implement `ShortestRoute(g, from, to, volume)` (Dijkstra via `container/heap`) in `agent/shortestpath.go` (FR-001, FR-002, FR-004, FR-005, FR-006, FR-008; depends on T002, T003)
+- [X] T004 [US1] Implement `ShortestRoute(g, from, to, volume)` (Dijkstra via `container/heap`) in `agent/shortestpath.go` (FR-001, FR-002, FR-004, FR-005, FR-006, FR-008; depends on T002, T003)
 
 ### Tests for User Story 1
 
-- [ ] T005 [P] [US1] Table-driven tests for `ShortestRoute` in `agent/shortestpath_test.go`, covering Acceptance Scenarios 1-2, the "no route", "origin == destination", "parallel edges", and "travel-time evaluation error" Edge Cases, and SC-001 (≥5 distinct graphs) (depends on T004)
+- [X] T005 [P] [US1] Table-driven tests for `ShortestRoute` in `agent/shortestpath_test.go`, covering Acceptance Scenarios 1-2, the "no route", "origin == destination", "parallel edges", and "travel-time evaluation error" Edge Cases, and SC-001 (≥5 distinct graphs) (depends on T004)
 
 **Checkpoint**: `go test ./agent/...` passes for route computation — User Story 1 is independently functional and testable.
 
@@ -78,11 +78,11 @@ origin/destination and confirm each one's route comes from its own
 
 ### Implementation for User Story 2
 
-- [ ] T006 [US2] Define the `Agent` struct (`Origin`, `Destination`) and implement `ComputeRoute(g)` in `agent/agent.go` (FR-003; depends on T004 — calls `ShortestRoute` with `volume = 0`)
+- [X] T006 [US2] Define the `Agent` struct (`Origin`, `Destination`) and implement `ComputeRoute(g)` in `agent/agent.go` (FR-003; depends on T004 — calls `ShortestRoute` with `volume = 0`)
 
 ### Tests for User Story 2
 
-- [ ] T007 [P] [US2] Table-driven tests for `Agent.ComputeRoute` in `agent/agent_test.go`, covering Acceptance Scenarios 1-2 and SC-003 (≥3 independently-created agents sharing an origin/destination yield identical, independently-computed routes) (depends on T006)
+- [X] T007 [P] [US2] Table-driven tests for `Agent.ComputeRoute` in `agent/agent_test.go`, covering Acceptance Scenarios 1-2 and SC-003 (≥3 independently-created agents sharing an origin/destination yield identical, independently-computed routes) (depends on T006)
 
 **Checkpoint**: `go test ./agent/...` now covers both route computation and independent agent behavior — User Stories 1 and 2 both independently pass.
 
@@ -98,11 +98,11 @@ exit code — no browser or UI required.
 
 ### Implementation for User Story 3
 
-- [ ] T008 [US3] Extend `cmd/graphcli/main.go`: add a fixed origin/destination on the existing sample network, construct 2-3 independent `agent.Agent` values, call `ComputeRoute` on each, and print each one's ordered route (edge IDs and endpoints) and total travel time (FR-007; depends on T006)
+- [X] T008 [US3] Extend `cmd/graphcli/main.go`: add a fixed origin/destination on the existing sample network, construct 2-3 independent `agent.Agent` values, call `ComputeRoute` on each, and print each one's ordered route (edge IDs and endpoints) and total travel time (FR-007; depends on T006)
 
 ### Validation for User Story 3
 
-- [ ] T009 [US3] Run `go run ./cmd/graphcli` per quickstart.md and confirm the printed agent routes and a `0` exit code (SC-002) (depends on T008)
+- [X] T009 [US3] Run `go run ./cmd/graphcli` per quickstart.md and confirm the printed agent routes and a `0` exit code (SC-002) (depends on T008)
 
 **Checkpoint**: All three user stories are independently functional — the feature is complete for roadmap Phase 2.
 
@@ -110,9 +110,9 @@ exit code — no browser or UI required.
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T010 [P] Run `gofmt -l .` and `go vet ./...` across `agent/` and the updated `cmd/graphcli/`; fix any findings
-- [ ] T011 Run the full quickstart.md validation end-to-end (`go test ./...` then `go run ./cmd/graphcli`) (depends on T005, T007, T009)
-- [ ] T012 [P] Add a package doc comment to `agent/agent.go` stating the package's scope: depends only on `graph` + stdlib (Principle I), and that every `Agent` computes its route independently (Principle III)
+- [X] T010 [P] Run `gofmt -l .` and `go vet ./...` across `agent/` and the updated `cmd/graphcli/`; fix any findings
+- [X] T011 Run the full quickstart.md validation end-to-end (`go test ./...` then `go run ./cmd/graphcli`) (depends on T005, T007, T009)
+- [X] T012 [P] Add a package doc comment to `agent/agent.go` stating the package's scope: depends only on `graph` + stdlib (Principle I), and that every `Agent` computes its route independently (Principle III)
 
 ---
 
