@@ -11,6 +11,7 @@ import (
 
 	"braess/agent"
 	"braess/graph"
+	"braess/queuesim"
 	"braess/simulation"
 )
 
@@ -46,7 +47,11 @@ func run() error {
 		return err
 	}
 
-	return printMultiDemand()
+	if err := printMultiDemand(); err != nil {
+		return err
+	}
+
+	return printSignalQueuing()
 }
 
 // printAgentRoutes constructs several independent agents for the fixed
@@ -301,4 +306,107 @@ func printEdges(g *graph.Graph) {
 		fmt.Printf("  %-8s %s -> %-16s length=%-4g capacity=%-4g travel_time(volume=%g)=%g\n",
 			e.ID, e.From, e.To, e.Length, e.Capacity, sampleVolume, tt)
 	}
+}
+
+// printSignalQueuing runs the classic two-road, opposite-phase signal
+// scenario (feature 008) and prints each road's queue length over time
+// plus an arrival/wait summary — proving, in text, that real queuing
+// happens and letting the reader see for themselves whether one road
+// ends up more congested, it oscillates, or it balances (spec
+// Assumptions: this feature does not presume the answer).
+func printSignalQueuing() error {
+	g, signals, demands, err := signalQueuingNetwork()
+	if err != nil {
+		return fmt.Errorf("building signal queuing network: %w", err)
+	}
+	const duration, tick = 70, 0.25
+
+	result, err := queuesim.Run(g, signals, demands, duration, tick)
+	if err != nil {
+		return fmt.Errorf("running signal queuing scenario: %w", err)
+	}
+
+	fmt.Println("Signal-controlled queuing (two roads, always-opposite signals):")
+
+	avgQueue := make(map[string]float64)
+	count := make(map[string]int)
+	for _, s := range result.QueueSamples {
+		avgQueue[s.SignalID] += float64(s.Length)
+		count[s.SignalID]++
+	}
+	for _, s := range signals {
+		if n := count[s.ID]; n > 0 {
+			avgQueue[s.ID] /= float64(n)
+		}
+		fmt.Printf("  %s (edge %s): green=%gs red=%gs -> average queue length=%.2f\n",
+			s.ID, s.EdgeID, s.GreenDuration, s.RedDuration, avgQueue[s.ID])
+	}
+
+	// A snapshot of each road's queue every 5 simulated seconds, enough
+	// to see the shape of the curve rise and fall.
+	fmt.Println("  queue length over time (every 5s):")
+	for _, s := range signals {
+		fmt.Printf("    %-10s", s.ID+":")
+		for _, sample := range result.QueueSamples {
+			if sample.SignalID != s.ID {
+				continue
+			}
+			isSampleTick := sample.Time == float64(int(sample.Time/5))*5
+			if isSampleTick {
+				fmt.Printf(" %d", sample.Length)
+			}
+		}
+		fmt.Println()
+	}
+
+	arrived, waiting := 0, 0
+	var totalWait float64
+	for _, a := range result.Agents {
+		if a.Arrived {
+			arrived++
+		} else {
+			waiting++
+		}
+		totalWait += a.WaitTime
+	}
+	fmt.Printf("  agents: spawned=%d arrived=%d still-waiting=%d average_wait=%.2f\n",
+		len(result.Agents), arrived, waiting, totalWait/float64(len(result.Agents)))
+
+	return nil
+}
+
+// signalQueuingNetwork builds the classic two-road, opposite-phase
+// setup: one house, one company, two parallel roads between them, each
+// governed by its own signal, always in opposite phase purely by sharing
+// a cycle and being offset by one GreenDuration (queuesim research.md
+// decision #4) — mirrors queuesim/two_road_test.go's fixture (a test
+// file, so not importable from here — feature 003's cmd/graphcli
+// established the same small-duplication precedent for its Braess
+// network).
+func signalQueuingNetwork() (*graph.Graph, []queuesim.Signal, []queuesim.Demand, error) {
+	g := graph.New()
+	for _, id := range []string{"h1", "c1"} {
+		t := graph.House
+		if id == "c1" {
+			t = graph.Company
+		}
+		if _, err := g.AddNode(id, t); err != nil {
+			return nil, nil, nil, err
+		}
+	}
+	for _, edgeID := range []string{"road-a", "road-b"} {
+		if _, err := g.AddEdge(edgeID, "h1", "c1", 0, 0, graph.Constant(1)); err != nil {
+			return nil, nil, nil, err
+		}
+	}
+
+	signals := []queuesim.Signal{
+		{ID: "signal-a", EdgeID: "road-a", GreenDuration: 5, RedDuration: 5, Offset: 5, DischargeRate: 2},
+		{ID: "signal-b", EdgeID: "road-b", GreenDuration: 5, RedDuration: 5, Offset: 0, DischargeRate: 2},
+	}
+	demands := []queuesim.Demand{
+		{Origin: "h1", Destination: "c1", Count: 150, ArrivalInterval: 0.3},
+	}
+
+	return g, signals, demands, nil
 }
