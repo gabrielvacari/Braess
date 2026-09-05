@@ -1,6 +1,8 @@
+import { Fragment } from "react";
 import { Arrow, Circle, Layer, Line, RegularPolygon, Rect, Stage, Text } from "react-konva";
 import { emptyCanvasHint } from "../content/copy";
 import type { ClientNode, ClientRoad } from "../model/network";
+import { roadChevronPositions } from "../model/roadVisuals";
 
 /** One agent icon's current position, for the animation layer (US1/T011). */
 export interface AgentMarker {
@@ -25,7 +27,7 @@ export interface NetworkCanvasProps {
   /** A node or road id to visually highlight (US2: the current selection). */
   selectedId?: string | null;
   /**
-   * Overrides a road's stroke color by id (feature 010, research.md
+   * Overrides a road's surface color by id (feature 010, research.md
    * decision #5) — used by Signals mode to show a signal-controlled
    * road's live green/red state. Omitted entirely, rendering is
    * unchanged from before this prop existed; selection highlighting
@@ -33,17 +35,32 @@ export interface NetworkCanvasProps {
    */
   roadColors?: Record<string, string>;
   /**
-   * Renders every road as an arrow (a -> b) instead of a plain line, so
-   * a one-way road's direction is actually visible — omitted (the
-   * default) for the equilibrium mode, whose roads are genuinely
-   * bidirectional and would be misrepresented by an arrow. Signals mode
-   * passes true, since every DirectedRoad there really does run one way.
+   * Adds repeated directional marks along every road (feature 011,
+   * FR-004) so a one-way road's direction is actually visible —
+   * omitted (the default) for the equilibrium mode, whose roads are
+   * genuinely bidirectional and would be misrepresented by a direction.
+   * Signals mode passes true, since every DirectedRoad there really
+   * does run one way.
    */
   directed?: boolean;
 }
 
 const NODE_RADIUS = 18;
 const SELECTION_COLOR = "#2f6fed";
+
+// Feature 011: roads read as roads, not lines — a thick strip (rounded
+// at the ends, via lineCap) with a dashed center-line marking. The
+// marking colors stay fixed regardless of selection/signal state
+// (research.md decision #2/#3) — only the strip itself changes color,
+// the same way real lane paint doesn't change color with traffic.
+const ROAD_WIDTH = 10;
+const ROAD_WIDTH_SELECTED = 14;
+const ROAD_BASE_COLOR = "#495057";
+const CENTERLINE_COLOR = "#f1f3f5";
+const CENTERLINE_WIDTH = 2;
+const CENTERLINE_DASH = [10, 8];
+const DIRECTION_MARK_SPACING = 40;
+const DIRECTION_MARK_HALF_LENGTH = 6;
 
 // FR-002/SC-001: each node type gets a distinct shape, color, AND text
 // label, used for no other purpose — see content/copy.ts's
@@ -135,46 +152,65 @@ export function NetworkCanvas({
             if (!a || !b) return null;
             const isSelected = road.id === selectedId;
             const overrideColor = roadColors?.[road.id];
-            const color = isSelected ? SELECTION_COLOR : (overrideColor ?? "#495057");
+            // The surface color carries selection/signal state
+            // (FR-006/FR-007); the center line and direction marks
+            // below always stay CENTERLINE_COLOR, like real lane paint
+            // that doesn't change with traffic (research.md decision #2).
+            const surfaceColor = isSelected ? SELECTION_COLOR : (overrideColor ?? ROAD_BASE_COLOR);
+            const strokeWidth = isSelected ? ROAD_WIDTH_SELECTED : ROAD_WIDTH;
             const handleClick = (e: { cancelBubble: boolean }) => {
               e.cancelBubble = true;
               onRoadClick?.(road.id);
             };
-
-            if (directed) {
-              // Pull the arrow's tip back to b's edge rather than its
-              // center — drawn at the exact center, the arrowhead would
-              // render underneath the node shape (painted afterward) and
-              // never be visible.
-              const dx = b.x - a.x;
-              const dy = b.y - a.y;
-              const dist = Math.hypot(dx, dy) || 1;
-              const tipX = b.x - (dx / dist) * NODE_RADIUS;
-              const tipY = b.y - (dy / dist) * NODE_RADIUS;
-              return (
-                <Arrow
-                  key={road.id}
-                  points={[a.x, a.y, tipX, tipY]}
-                  stroke={color}
-                  fill={color}
-                  strokeWidth={isSelected ? 4 : 2}
-                  pointerLength={10}
-                  pointerWidth={10}
-                  hitStrokeWidth={16}
-                  onClick={handleClick}
-                />
-              );
-            }
+            // FR-005: a bidirectional (non-directed) road gets no marks
+            // at all — only Signals mode's one-way roads do.
+            const marks = directed ? roadChevronPositions(a, b, NODE_RADIUS, DIRECTION_MARK_SPACING) : [];
 
             return (
-              <Line
-                key={road.id}
-                points={[a.x, a.y, b.x, b.y]}
-                stroke={color}
-                strokeWidth={isSelected ? 4 : 2}
-                hitStrokeWidth={16}
-                onClick={handleClick}
-              />
+              <Fragment key={road.id}>
+                {/* The road surface: a thick, rounded-cap strip (FR-001,
+                    FR-003) — the only piece that owns clicks/hit area,
+                    so selecting/removing a road is unchanged (FR-008). */}
+                <Line
+                  points={[a.x, a.y, b.x, b.y]}
+                  stroke={surfaceColor}
+                  strokeWidth={strokeWidth}
+                  lineCap="round"
+                  hitStrokeWidth={20}
+                  onClick={handleClick}
+                />
+                {/* The center-line lane marking (FR-002) — purely
+                    decorative, never intercepts clicks. */}
+                <Line
+                  points={[a.x, a.y, b.x, b.y]}
+                  stroke={CENTERLINE_COLOR}
+                  strokeWidth={CENTERLINE_WIDTH}
+                  dash={CENTERLINE_DASH}
+                  lineCap="round"
+                  listening={false}
+                />
+                {/* Pavement-style direction marks (FR-004) — small
+                    Arrows reuse the same primitive already verified to
+                    point correctly, rather than a hand-rotated polygon
+                    (research.md decision #3). */}
+                {marks.map((m, i) => (
+                  <Arrow
+                    key={`${road.id}-mark-${i}`}
+                    points={[
+                      m.x - m.dx * DIRECTION_MARK_HALF_LENGTH,
+                      m.y - m.dy * DIRECTION_MARK_HALF_LENGTH,
+                      m.x + m.dx * DIRECTION_MARK_HALF_LENGTH,
+                      m.y + m.dy * DIRECTION_MARK_HALF_LENGTH,
+                    ]}
+                    stroke={CENTERLINE_COLOR}
+                    fill={CENTERLINE_COLOR}
+                    strokeWidth={2}
+                    pointerLength={6}
+                    pointerWidth={6}
+                    listening={false}
+                  />
+                ))}
+              </Fragment>
             );
           })}
 
