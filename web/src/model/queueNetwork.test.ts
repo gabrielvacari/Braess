@@ -1,14 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  addDirectedRoad,
-  addNode,
-  addTimeDemand,
-  emptyQueueNetwork,
-  isQueueNetworkError,
-  removeDirectedRoad,
-  removeNodeFromQueueNetwork,
-  removeTimeDemand,
-} from "./queueNetwork";
+import { addDirectedRoad, addNode, emptyQueueNetwork, isQueueNetworkError, removeDirectedRoad, removeNodeFromQueueNetwork } from "./queueNetwork";
 
 describe("addDirectedRoad", () => {
   it("adds a one-way road, optionally with a signal", () => {
@@ -34,38 +25,18 @@ describe("addDirectedRoad", () => {
 });
 
 describe("removeNodeFromQueueNetwork", () => {
-  it("cascades to roads and demands referencing the removed node", () => {
+  it("cascades to roads referencing the removed node", () => {
     let state = addNode(emptyQueueNetwork, "house", 0, 0);
     state = addNode(state, "company", 100, 0);
     const [a, b] = state.nodes;
 
     const withRoad = addDirectedRoad(state, a.id, b.id, { type: "constant", value: 5 });
     if (isQueueNetworkError(withRoad)) throw new Error("unreachable");
-    const withDemand = addTimeDemand(withRoad, a.id, b.id, 10, 1);
 
-    const result = removeNodeFromQueueNetwork(withDemand, a.id);
+    const result = removeNodeFromQueueNetwork(withRoad, a.id);
 
     expect(result.nodes.map((n) => n.id)).toEqual([b.id]);
     expect(result.roads).toHaveLength(0);
-    expect(result.demands).toHaveLength(0);
-  });
-});
-
-describe("addTimeDemand / removeTimeDemand", () => {
-  it("adds a time-based demand with an arrival interval", () => {
-    const state = addTimeDemand(emptyQueueNetwork, "n1", "n2", 20, 2.5);
-    expect(state.demands).toHaveLength(1);
-    expect(state.demands[0]).toMatchObject({ origin: "n1", destination: "n2", count: 20, arrivalInterval: 2.5 });
-  });
-
-  it("removes the demand at the given index", () => {
-    let state = addTimeDemand(emptyQueueNetwork, "n1", "n2", 20, 2.5);
-    state = addTimeDemand(state, "n2", "n3", 5, 1);
-
-    const result = removeTimeDemand(state, 0);
-
-    expect(result.demands).toHaveLength(1);
-    expect(result.demands[0]).toMatchObject({ origin: "n2", destination: "n3" });
   });
 });
 

@@ -3,6 +3,7 @@
 // contracts/queue-api-contract.md). Sibling to api.ts's POST /api/run —
 // a deliberately separate contract (FR-006, FR-007), not a variant of it.
 import type { NodeDTO } from "./api";
+import { autoTimeDemands } from "./autoDemand";
 import type { QueueNetworkState, TravelTimeSpec } from "./queueNetwork";
 
 export interface EdgeDTO {
@@ -76,7 +77,12 @@ export interface QueueApiError {
   error: string;
 }
 
-/** Maps a QueueNetworkState (+ run duration/tick) to the wire request shape. */
+/**
+ * Maps a QueueNetworkState (+ run duration/tick) to the wire request
+ * shape. `demands` is no longer declared by a person (feature 012) — it
+ * comes entirely from autoTimeDemands, derived from the network's own
+ * house/company nodes (research.md decision #4).
+ */
 export function toQueueRunRequest(state: QueueNetworkState, duration: number, tick: number): QueueRunRequest {
   const signals: SignalDTO[] = state.roads
     .filter((r) => r.signal !== null)
@@ -98,12 +104,7 @@ export function toQueueRunRequest(state: QueueNetworkState, duration: number, ti
       travelTime: r.travelTime,
     })),
     signals,
-    demands: state.demands.map((d) => ({
-      origin: d.origin,
-      destination: d.destination,
-      count: d.count,
-      arrivalInterval: d.arrivalInterval,
-    })),
+    demands: autoTimeDemands(state.nodes),
     duration,
     tick,
   };

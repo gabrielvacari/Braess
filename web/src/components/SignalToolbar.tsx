@@ -1,6 +1,6 @@
-import { useState } from "react";
-import type { ClientNode, NodeType, TimeDemand, TravelTimeSpec } from "../model/queueNetwork";
+import { assignHousesToCompanies, AUTO_DEMAND_ARRIVAL_INTERVAL, AUTO_DEMAND_COUNT } from "../model/autoDemand";
 import { nodeDisplayLabel } from "../model/network";
+import type { ClientNode, NodeType, TravelTimeSpec } from "../model/queueNetwork";
 
 export type SignalMode = "place" | "connect" | "select";
 
@@ -60,12 +60,14 @@ interface SignalToolbarProps {
   hasSelection: boolean;
   onRemoveSelected: () => void;
   nodes: ClientNode[];
-  demands: TimeDemand[];
-  onAddDemand: (origin: string, destination: string, count: number, arrivalInterval: number) => void;
-  onRemoveDemand: (index: number) => void;
 }
 
-/** FR-001, FR-002: node/road(+signal) drawing controls and the time-based demand form for Signals mode. */
+/**
+ * FR-001: node/road(+signal) drawing controls for Signals mode. There is
+ * no demand form (feature 012) — every house always sends traffic
+ * automatically; this only shows, read-only, which company each house
+ * has been assigned to (FR-010), computed straight from `nodes`.
+ */
 export function SignalToolbar({
   mode,
   onModeChange,
@@ -83,14 +85,8 @@ export function SignalToolbar({
   hasSelection,
   onRemoveSelected,
   nodes,
-  demands,
-  onAddDemand,
-  onRemoveDemand,
 }: SignalToolbarProps) {
-  const [origin, setOrigin] = useState("");
-  const [destination, setDestination] = useState("");
-  const [count, setCount] = useState(50);
-  const [arrivalInterval, setArrivalInterval] = useState(1);
+  const assignments = assignHousesToCompanies(nodes);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
@@ -166,70 +162,27 @@ export function SignalToolbar({
       )}
 
       <div className="card">
-        <h3>Time-based demands</h3>
-        <p className="text-muted">Agents arrive at a steady rate over the run, not all at once.</p>
-        <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", margin: "var(--space-2) 0 var(--space-3)" }}>
-          <select aria-label="Origin" value={origin} onChange={(e) => setOrigin(e.target.value)}>
-            <option value="">origin…</option>
-            {nodes.map((n) => (
-              <option key={n.id} value={n.id}>
-                {nodeDisplayLabel(nodes, n.id)}
-              </option>
+        <h3>Automatic demand</h3>
+        <p className="text-muted">
+          Every house sends {AUTO_DEMAND_COUNT} agents every {AUTO_DEMAND_ARRIVAL_INTERVAL}s — there's nothing to
+          configure. The code picks which company each house's agents go to, spreading across every company you've
+          drawn rather than piling onto just one.
+        </p>
+        {assignments.length === 0 ? (
+          <p className="text-muted">
+            {nodes.some((n) => n.type === "house")
+              ? "Add a company for houses to send traffic to."
+              : "Add a house and a company to see traffic here."}
+          </p>
+        ) : (
+          <ul style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
+            {assignments.map((a) => (
+              <li key={a.houseId}>
+                {nodeDisplayLabel(nodes, a.houseId)} → {nodeDisplayLabel(nodes, a.companyId)}
+              </li>
             ))}
-          </select>
-          <select aria-label="Destination" value={destination} onChange={(e) => setDestination(e.target.value)}>
-            <option value="">destination…</option>
-            {nodes.map((n) => (
-              <option key={n.id} value={n.id}>
-                {nodeDisplayLabel(nodes, n.id)}
-              </option>
-            ))}
-          </select>
-          <label style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
-            <span className="text-muted" style={{ fontSize: "var(--text-xs)" }}>
-              Total agents
-            </span>
-            <input aria-label="Total agents" type="number" min={0} value={count} onChange={(e) => setCount(Number(e.target.value))} style={{ width: "4.5rem" }} />
-          </label>
-          <label style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
-            <span className="text-muted" style={{ fontSize: "var(--text-xs)" }}>
-              Arrival every (s)
-            </span>
-            <input
-              aria-label="Seconds between arrivals"
-              type="number"
-              min={0.1}
-              step={0.1}
-              value={arrivalInterval}
-              onChange={(e) => setArrivalInterval(Number(e.target.value))}
-              style={{ width: "4.5rem" }}
-            />
-          </label>
-          <button
-            type="button"
-            className="primary"
-            disabled={!origin || !destination}
-            onClick={() => {
-              onAddDemand(origin, destination, count, arrivalInterval);
-              setOrigin("");
-              setDestination("");
-            }}
-          >
-            Add
-          </button>
-        </div>
-        <ul style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
-          {demands.map((d, i) => (
-            <li key={`${d.origin}-${d.destination}-${i}`} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span>
-                {nodeDisplayLabel(nodes, d.origin)} → {nodeDisplayLabel(nodes, d.destination)} ({d.count} agents, one every {d.arrivalInterval}s)
-              </span>
-              <button type="button" className="icon" aria-label={`Remove demand ${d.origin} to ${d.destination}`} onClick={() => onRemoveDemand(i)}>
-                ✕
-              </button>
-            </li>
-          ))}
-        </ul>
+          </ul>
+        )}
       </div>
     </div>
   );

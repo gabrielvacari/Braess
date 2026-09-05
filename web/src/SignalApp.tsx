@@ -4,17 +4,16 @@ import { NetworkCanvas, type AgentMarker } from "./components/NetworkCanvas";
 import { PlaybackControls } from "./components/PlaybackControls";
 import { QueueResultsPanel } from "./components/QueueResultsPanel";
 import { SignalToolbar, type SignalMode } from "./components/SignalToolbar";
+import { autoTimeDemands } from "./model/autoDemand";
 import { humanizeErrorMessage, type ClientRoad } from "./model/network";
 import { runQueueSimulation, toQueueRunRequest, type QueueRunResponse } from "./model/queueApi";
 import { groupPositionsByAgent, positionAtSimTime, signalGreenAtSimTime } from "./model/queuePlayback";
 import {
   addDirectedRoad,
-  addTimeDemand,
   emptyQueueNetwork,
   isQueueNetworkError,
   removeDirectedRoad,
   removeNodeFromQueueNetwork,
-  removeTimeDemand,
   addNode as addQueueNode,
   type NodeType,
   type QueueNetworkState,
@@ -179,7 +178,12 @@ export function SignalApp() {
     return colors;
   }, [result, network.roads, clock.time]);
 
-  const runDisabled = network.demands.length === 0 || running;
+  // Feature 012: there's no demand form anymore — "Run" is gated on
+  // whether the network's houses/companies actually produce any
+  // automatic demand at all (autoTimeDemands is empty with no house or
+  // no company to assign one to).
+  const hasDemand = autoTimeDemands(network.nodes).length > 0;
+  const runDisabled = !hasDemand || running;
 
   return (
     <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "var(--space-5)" }}>
@@ -195,7 +199,9 @@ export function SignalApp() {
           <button type="button" className="primary" onClick={() => void handleRun()} disabled={runDisabled}>
             {running ? "Running…" : "Run"}
           </button>
-          {network.demands.length === 0 && <small style={{ maxWidth: "260px", textAlign: "right" }}>Add at least one time-based demand before running.</small>}
+          {!hasDemand && (
+            <small style={{ maxWidth: "260px", textAlign: "right" }}>Draw at least one house and one company, connected by roads, before running.</small>
+          )}
           {editError && <small style={{ color: "var(--color-danger)" }}>⚠ {editError}</small>}
           {error && <small style={{ color: "var(--color-danger)" }}>⚠ {error}</small>}
         </div>
@@ -231,11 +237,6 @@ export function SignalApp() {
             hasSelection={selection !== null}
             onRemoveSelected={handleRemoveSelected}
             nodes={network.nodes}
-            demands={network.demands}
-            onAddDemand={(origin, destination, count, arrivalInterval) =>
-              applyEdit((net) => addTimeDemand(net, origin, destination, count, arrivalInterval))
-            }
-            onRemoveDemand={(index) => applyEdit((net) => removeTimeDemand(net, index))}
           />
         </div>
 
