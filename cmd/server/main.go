@@ -10,6 +10,7 @@ import (
 func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/run", handleRun)
+	mux.HandleFunc("POST /api/queue-run", handleQueueRun)
 
 	port := os.Getenv("PORT")
 	if port == "" {

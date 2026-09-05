@@ -7,6 +7,7 @@ import { NetworkCanvas, type AgentMarker } from "./components/NetworkCanvas";
 import { ResultsPanel } from "./components/ResultsPanel";
 import { Toolbar, type EditMode } from "./components/Toolbar";
 import { missingDemandHint } from "./content/copy";
+import { SignalApp } from "./SignalApp";
 import { runSimulation, toRunRequest, type RunResponse } from "./model/api";
 import {
   addDemand,
@@ -108,7 +109,7 @@ function buildAgentSpecs(result: RunResponse, network: NetworkState): AgentSpec[
 
 type Selection = { kind: "node" | "road"; id: string } | null;
 
-function App() {
+function EquilibriumApp() {
   const [network, setNetwork] = useState<NetworkState>(emptyNetwork);
   const [history, setHistory] = useState(emptyRunHistory);
   const result = history.current;
@@ -298,6 +299,64 @@ function App() {
           onUpdate={handleUpdate}
         />
       ))}
+    </div>
+  );
+}
+
+type AppMode = "equilibrium" | "signals";
+
+/**
+ * Top-level mode toggle (FR-006, FR-007): switches between the
+ * equilibrium mode (EquilibriumApp, features 003-007) and the
+ * signal-controlled mode (SignalApp, feature 009) without either one
+ * ever seeing the other's state — each keeps its own network, its own
+ * run flow, and its own result view.
+ */
+function App() {
+  const [mode, setMode] = useState<AppMode>("equilibrium");
+
+  return (
+    <div>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          gap: "var(--space-2)",
+          padding: "var(--space-3) 0",
+        }}
+      >
+        <div role="radiogroup" style={{ display: "flex", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", overflow: "hidden" }}>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={mode === "equilibrium"}
+            onClick={() => setMode("equilibrium")}
+            style={{
+              border: "none",
+              borderRadius: 0,
+              background: mode === "equilibrium" ? "var(--color-accent)" : "var(--color-surface)",
+              color: mode === "equilibrium" ? "var(--color-accent-contrast)" : "var(--color-text)",
+            }}
+          >
+            Equilibrium
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={mode === "signals"}
+            onClick={() => setMode("signals")}
+            style={{
+              border: "none",
+              borderRadius: 0,
+              background: mode === "signals" ? "var(--color-accent)" : "var(--color-surface)",
+              color: mode === "signals" ? "var(--color-accent-contrast)" : "var(--color-text)",
+            }}
+          >
+            Signals
+          </button>
+        </div>
+      </div>
+      {mode === "equilibrium" ? <EquilibriumApp /> : <SignalApp />}
     </div>
   );
 }

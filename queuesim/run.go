@@ -31,6 +31,7 @@ const (
 // still in the run — not part of the public contract (see report.go's
 // AgentReport for what a caller actually sees).
 type inFlightAgent struct {
+	id          int
 	demandIndex int
 	route       []graph.Edge
 	edgeIndex   int
@@ -119,19 +120,22 @@ func Run(g *graph.Graph, signals []Signal, demands []Demand, duration, tick floa
 	var inFlight []*inFlightAgent
 	var result RunResult
 	spawned := make([]int, len(demands))
+	nextID := 0 // spawn-order agent identifier (feature 010, research.md decision #2)
 
 	for t := 0.0; t < duration; t += tick {
 		// 1. Spawn agents whose arrival schedule has come due.
 		for di, d := range demands {
 			for spawned[di] < d.Count && float64(spawned[di])*d.ArrivalInterval <= t {
 				spawned[di]++
+				id := nextID
+				nextID++
 				route, err := shortestRouteAt(g, d.Origin, d.Destination, edgeCostAt(t))
 				if err != nil {
 					return RunResult{}, fmt.Errorf("demand %d: %w", di, err)
 				}
-				a := &inFlightAgent{demandIndex: di, route: route, spawnTime: t}
+				a := &inFlightAgent{id: id, demandIndex: di, route: route, spawnTime: t}
 				if len(route) == 0 {
-					result.Agents = append(result.Agents, AgentReport{DemandIndex: di, SpawnTime: t, Arrived: true})
+					result.Agents = append(result.Agents, AgentReport{ID: id, DemandIndex: di, SpawnTime: t, Arrived: true})
 					continue
 				}
 				enterEdge(a, 0, t)
@@ -152,8 +156,15 @@ func Run(g *graph.Graph, signals []Signal, demands []Demand, duration, tick floa
 				a.travelTime += tick
 				if a.remaining <= 0 {
 					if a.edgeIndex+1 >= len(a.route) {
+						// One last position sample at the moment of
+						// arrival (feature 010, research.md decision #3)
+						// — without it, the final edge of a trip would
+						// never show the agent actually reaching its end.
+						result.Positions = append(result.Positions, PositionSample{
+							Time: t, AgentID: a.id, EdgeID: a.route[a.edgeIndex].ID, Progress: 1,
+						})
 						result.Agents = append(result.Agents, AgentReport{
-							DemandIndex: a.demandIndex, SpawnTime: a.spawnTime,
+							ID: a.id, DemandIndex: a.demandIndex, SpawnTime: a.spawnTime,
 							TravelTime: a.travelTime, WaitTime: a.waitTime, Arrived: true,
 						})
 						continue
@@ -185,10 +196,35 @@ func Run(g *graph.Graph, signals []Signal, demands []Demand, duration, tick floa
 			}
 		}
 
-		// 4. Sample every signal's queue length this tick (FR-004).
+		// 4. Sample every signal's queue length and phase this tick
+		// (FR-004; feature 010 FR-002 adds Green).
 		for _, s := range signals {
 			result.QueueSamples = append(result.QueueSamples, QueueSample{
-				Time: t, SignalID: s.ID, Length: len(queues[s.EdgeID]),
+				Time: t, SignalID: s.ID, Length: len(queues[s.EdgeID]), Green: s.IsGreenAt(t),
+			})
+		}
+
+		// 5. Record every remaining in-flight agent's position this tick
+		// (feature 010, FR-001), reflecting any promotion the discharge
+		// step above just made.
+		for _, a := range inFlight {
+			edgeID := a.route[a.edgeIndex].ID
+			progress := 0.0
+			if a.state == moving {
+				// A zero-or-negative free-flow time (e.g. a linear
+				// travel-time function whose freeFlow parameter is 0)
+				// makes this edge instantaneous — 1-a.remaining/0 would
+				// be NaN, which encoding/json cannot serialize at all
+				// (silently producing an empty response body). Treat it
+				// as already fully traversed instead.
+				if freeFlow[edgeID] > 0 {
+					progress = 1 - a.remaining/freeFlow[edgeID]
+				} else {
+					progress = 1
+				}
+			}
+			result.Positions = append(result.Positions, PositionSample{
+				Time: t, AgentID: a.id, EdgeID: edgeID, Progress: progress, Queued: a.state == queued,
 			})
 		}
 	}
@@ -197,7 +233,7 @@ func Run(g *graph.Graph, signals []Signal, demands []Demand, duration, tick floa
 	// not arrived (FR-008, SC-005) — never presented as having completed.
 	for _, a := range inFlight {
 		result.Agents = append(result.Agents, AgentReport{
-			DemandIndex: a.demandIndex, SpawnTime: a.spawnTime,
+			ID: a.id, DemandIndex: a.demandIndex, SpawnTime: a.spawnTime,
 			TravelTime: a.travelTime, WaitTime: a.waitTime, Arrived: false,
 		})
 	}

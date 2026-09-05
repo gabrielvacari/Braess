@@ -1,4 +1,4 @@
-import { Circle, Layer, Line, RegularPolygon, Rect, Stage, Text } from "react-konva";
+import { Arrow, Circle, Layer, Line, RegularPolygon, Rect, Stage, Text } from "react-konva";
 import { emptyCanvasHint } from "../content/copy";
 import type { ClientNode, ClientRoad } from "../model/network";
 
@@ -24,6 +24,22 @@ export interface NetworkCanvasProps {
   onRoadClick?: (id: string) => void;
   /** A node or road id to visually highlight (US2: the current selection). */
   selectedId?: string | null;
+  /**
+   * Overrides a road's stroke color by id (feature 010, research.md
+   * decision #5) — used by Signals mode to show a signal-controlled
+   * road's live green/red state. Omitted entirely, rendering is
+   * unchanged from before this prop existed; selection highlighting
+   * still takes precedence over it.
+   */
+  roadColors?: Record<string, string>;
+  /**
+   * Renders every road as an arrow (a -> b) instead of a plain line, so
+   * a one-way road's direction is actually visible — omitted (the
+   * default) for the equilibrium mode, whose roads are genuinely
+   * bidirectional and would be misrepresented by an arrow. Signals mode
+   * passes true, since every DirectedRoad there really does run one way.
+   */
+  directed?: boolean;
 }
 
 const NODE_RADIUS = 18;
@@ -89,6 +105,8 @@ export function NetworkCanvas({
   onNodeClick,
   onRoadClick,
   selectedId = null,
+  roadColors,
+  directed = false,
 }: NetworkCanvasProps) {
   const nodeById = new Map(nodes.map((n) => [n.id, n]));
   const hint = emptyCanvasHint(nodes.length); // FR-004
@@ -116,17 +134,46 @@ export function NetworkCanvas({
             const b = nodeById.get(road.b);
             if (!a || !b) return null;
             const isSelected = road.id === selectedId;
+            const overrideColor = roadColors?.[road.id];
+            const color = isSelected ? SELECTION_COLOR : (overrideColor ?? "#495057");
+            const handleClick = (e: { cancelBubble: boolean }) => {
+              e.cancelBubble = true;
+              onRoadClick?.(road.id);
+            };
+
+            if (directed) {
+              // Pull the arrow's tip back to b's edge rather than its
+              // center — drawn at the exact center, the arrowhead would
+              // render underneath the node shape (painted afterward) and
+              // never be visible.
+              const dx = b.x - a.x;
+              const dy = b.y - a.y;
+              const dist = Math.hypot(dx, dy) || 1;
+              const tipX = b.x - (dx / dist) * NODE_RADIUS;
+              const tipY = b.y - (dy / dist) * NODE_RADIUS;
+              return (
+                <Arrow
+                  key={road.id}
+                  points={[a.x, a.y, tipX, tipY]}
+                  stroke={color}
+                  fill={color}
+                  strokeWidth={isSelected ? 4 : 2}
+                  pointerLength={10}
+                  pointerWidth={10}
+                  hitStrokeWidth={16}
+                  onClick={handleClick}
+                />
+              );
+            }
+
             return (
               <Line
                 key={road.id}
                 points={[a.x, a.y, b.x, b.y]}
-                stroke={isSelected ? SELECTION_COLOR : "#495057"}
+                stroke={color}
                 strokeWidth={isSelected ? 4 : 2}
                 hitStrokeWidth={16}
-                onClick={(e) => {
-                  e.cancelBubble = true;
-                  onRoadClick?.(road.id);
-                }}
+                onClick={handleClick}
               />
             );
           })}
