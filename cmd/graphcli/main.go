@@ -42,7 +42,11 @@ func run() error {
 		return err
 	}
 
-	return printBraessParadox()
+	if err := printBraessParadox(); err != nil {
+		return err
+	}
+
+	return printMultiDemand()
 }
 
 // printAgentRoutes constructs several independent agents for the fixed
@@ -149,6 +153,83 @@ func braessNetwork(withShortcut bool) (*graph.Graph, error) {
 
 	if withShortcut {
 		if _, err := g.AddEdge("A-B", "A", "B", 0, 0, graph.Constant(0)); err != nil {
+			return nil, err
+		}
+	}
+
+	return g, nil
+}
+
+// printMultiDemand runs several distinct house/company demands together
+// on one shared network and prints each demand's own result plus one
+// overall result — proving, in text, that congestion is genuinely shared
+// across distinct origin/destination pairs (roadmap Phase 4).
+func printMultiDemand() error {
+	g, err := multiDemandNetwork()
+	if err != nil {
+		return fmt.Errorf("building multi-demand network: %w", err)
+	}
+
+	mp := simulation.MultiPopulation{
+		Demands: []simulation.Demand{
+			{Origin: "house-A", Destination: "company-X", Size: 40},
+			{Origin: "house-B", Destination: "company-Y", Size: 35},
+			{Origin: "house-C", Destination: "company-Z", Size: 30},
+		},
+		MaxRounds: simulation.DefaultMaxRounds,
+	}
+
+	result, err := simulation.RunDemands(g, mp)
+	if err != nil {
+		return fmt.Errorf("running multi-demand population: %w", err)
+	}
+
+	fmt.Println("Multiple origins/destinations (shared bottleneck road):")
+	for _, dr := range result.PerDemand {
+		fmt.Printf("  %s -> %s (%d agents): total=%g average=%g\n",
+			dr.Demand.Origin, dr.Demand.Destination, dr.Demand.Size, dr.TotalTravelTime, dr.AverageTravelTime)
+	}
+	fmt.Printf("  overall: converged=%t rounds=%d total=%g average=%g\n",
+		result.Converged, result.Rounds, result.TotalTravelTime, result.AverageTravelTime)
+
+	return nil
+}
+
+// multiDemandNetwork builds a network where three houses each feed into a
+// shared hub, a single bottleneck road (hub-in -> hub-out) is the only way
+// across, and the hub fans out to three companies. All three demands are
+// forced through the same bottleneck, so it congests all of them together.
+func multiDemandNetwork() (*graph.Graph, error) {
+	g := graph.New()
+
+	nodes := []struct {
+		id string
+		t  graph.NodeType
+	}{
+		{"house-A", graph.House}, {"house-B", graph.House}, {"house-C", graph.House},
+		{"hub-in", graph.Intersection}, {"hub-out", graph.Intersection},
+		{"company-X", graph.Company}, {"company-Y", graph.Company}, {"company-Z", graph.Company},
+	}
+	for _, n := range nodes {
+		if _, err := g.AddNode(n.id, n.t); err != nil {
+			return nil, err
+		}
+	}
+
+	edges := []struct {
+		id, from, to string
+		tt           graph.TravelTimeFunc
+	}{
+		{"house-A-hub", "house-A", "hub-in", graph.Constant(0)},
+		{"house-B-hub", "house-B", "hub-in", graph.Constant(0)},
+		{"house-C-hub", "house-C", "hub-in", graph.Constant(0)},
+		{"bottleneck", "hub-in", "hub-out", graph.Linear(0, 0.1)},
+		{"hub-company-X", "hub-out", "company-X", graph.Constant(0)},
+		{"hub-company-Y", "hub-out", "company-Y", graph.Constant(0)},
+		{"hub-company-Z", "hub-out", "company-Z", graph.Constant(0)},
+	}
+	for _, e := range edges {
+		if _, err := g.AddEdge(e.id, e.from, e.to, 0, 0, e.tt); err != nil {
 			return nil, err
 		}
 	}

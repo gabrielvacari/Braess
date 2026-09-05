@@ -29,7 +29,7 @@ Generalizes `simulation/run.go` (feature 003) internally, adds
 
 ## Phase 1: Setup
 
-- [ ] T001 [P] Create `simulation/demand.go` per plan.md's Project Structure
+- [X] T001 [P] Create `simulation/demand.go` per plan.md's Project Structure
 
 ---
 
@@ -40,11 +40,11 @@ story in this feature needs
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T002 Generalize `loadIncrementally` in `simulation/run.go` to accept a flat `[]odPair{origin, destination string; demandIndex int}` instead of a `Population`, returning `(routes []agent.Route, volumes map[string]float64, failedAt int, err error)` (contracts/simulation-api-extension.md)
-- [ ] T003 Generalize `refine` in `simulation/run.go` the same way, returning `(rounds int, converged bool, failedAt int, err error)` (depends on T002)
-- [ ] T004 Update `Run` in `simulation/run.go` to build a same-pair `[]odPair` from its `Population` and call the generalized core from T002/T003, preserving `Run`'s exact existing signature and behavior (depends on T003)
-- [ ] T005 Run `go test ./simulation/...` and confirm every feature-003 test — including the exact Braess 65 → 80 numbers in `braess_test.go` — still passes unmodified: the regression check for the T002-T004 refactor (depends on T004)
-- [ ] T006 [P] Define `Demand`, `MultiPopulation`, `DemandResult`, and `MultiAssignmentResult` in `simulation/demand.go` (data-model.md; contracts/simulation-api-extension.md)
+- [X] T002 Generalize `loadIncrementally` in `simulation/run.go` to accept a flat `[]odPair{origin, destination string; demandIndex int}` instead of a `Population`, returning `(routes []agent.Route, volumes map[string]float64, failedAt int, err error)` (contracts/simulation-api-extension.md)
+- [X] T003 Generalize `refine` in `simulation/run.go` the same way, returning `(rounds int, converged bool, failedAt int, err error)` (depends on T002)
+- [X] T004 Update `Run` in `simulation/run.go` to build a same-pair `[]odPair` from its `Population` and call the generalized core from T002/T003, preserving `Run`'s exact existing signature and behavior (depends on T003)
+- [X] T005 Run `go test ./simulation/...` and confirm every feature-003 test — including the exact Braess 65 → 80 numbers in `braess_test.go` — still passes unmodified: the regression check for the T002-T004 refactor (depends on T004)
+- [X] T006 [P] Define `Demand`, `MultiPopulation`, `DemandResult`, and `MultiAssignmentResult` in `simulation/demand.go` (data-model.md; contracts/simulation-api-extension.md)
 
 **Checkpoint**: Foundation ready — user story implementation can now begin
 
@@ -62,11 +62,11 @@ changes the other's resulting travel time, via `go test
 
 ### Implementation for User Story 1
 
-- [ ] T007 [US1] Implement `RunDemands` in `simulation/demand.go`: build the flat `[]odPair` (tagging each agent's `demandIndex`), call the generalized `loadIncrementally`/`refine` from Phase 2, compute the overall `TotalTravelTime`/`AverageTravelTime`, and wrap any failure with a `demandError` helper naming the specific `Demand` by index and origin/destination (FR-001, FR-002, FR-003, FR-004, FR-008; depends on T003, T006)
+- [X] T007 [US1] Implement `RunDemands` in `simulation/demand.go`: build the flat `[]odPair` (tagging each agent's `demandIndex`), call the generalized `loadIncrementally`/`refine` from Phase 2, compute the overall `TotalTravelTime`/`AverageTravelTime`, and wrap any failure with a `demandError` helper naming the specific `Demand` by index and origin/destination (FR-001, FR-002, FR-003, FR-004, FR-008; depends on T003, T006)
 
 ### Tests for User Story 1
 
-- [ ] T008 [P] [US1] Tests for `RunDemands` in `simulation/demand_test.go`, covering Acceptance Scenarios 1-2 (a shared bottleneck road's travel time reflects combined traffic from both demands; increasing one demand's size measurably changes the other's reported average — SC-001) and FR-008 (a demand with no route produces an error naming that specific demand) (depends on T007)
+- [X] T008 [P] [US1] Tests for `RunDemands` in `simulation/demand_test.go`, covering Acceptance Scenarios 1-2 (a shared bottleneck road's travel time reflects combined traffic from both demands; increasing one demand's size measurably changes the other's reported average — SC-001) and FR-008 (a demand with no route produces an error naming that specific demand) (depends on T007)
 
 **Checkpoint**: `go test ./simulation/...` passes for shared congestion across demands — User Story 1 is independently functional and testable.
 
@@ -83,11 +83,11 @@ demand's own reported result reflects only that demand's own agents, via
 
 ### Implementation for User Story 2
 
-- [ ] T009 [US2] Implement per-demand grouping in `RunDemands` (`simulation/demand.go`): populate each `DemandResult`'s `Routes`/`TotalTravelTime`/`AverageTravelTime` from the shared final assignment using each agent's `demandIndex`, and handle a zero-size demand cleanly (FR-005, FR-007; depends on T007)
+- [X] T009 [US2] Implement per-demand grouping in `RunDemands` (`simulation/demand.go`): populate each `DemandResult`'s `Routes`/`TotalTravelTime`/`AverageTravelTime` from the shared final assignment using each agent's `demandIndex`, and handle a zero-size demand cleanly (FR-005, FR-007; depends on T007)
 
 ### Tests for User Story 2
 
-- [ ] T010 [P] [US2] Tests for per-demand reporting in `simulation/demand_test.go`, covering Acceptance Scenarios 1-2 (each demand's own numbers reflect only its own agents; one overall total/average is also available) and FR-007 (a zero-agent demand reports a trivial result without affecting other demands) (depends on T009)
+- [X] T010 [P] [US2] Tests for per-demand reporting in `simulation/demand_test.go`, covering Acceptance Scenarios 1-2 (each demand's own numbers reflect only its own agents; one overall total/average is also available) and FR-007 (a zero-agent demand reports a trivial result without affecting other demands) (depends on T009)
 
 **Checkpoint**: `go test ./simulation/...` now covers shared congestion and per-demand reporting — User Stories 1 and 2 both independently pass.
 
@@ -104,15 +104,15 @@ output and exit code — no browser or UI required.
 
 ### Implementation for User Story 3
 
-- [ ] T011 [US3] Extend `cmd/graphcli/main.go`: build a small network where at least 3 distinct house/company demands share a bottleneck road, run `simulation.RunDemands`, and print each demand's own total/average plus one overall total/average (FR-006, FR-009; depends on T009)
+- [X] T011 [US3] Extend `cmd/graphcli/main.go`: build a small network where at least 3 distinct house/company demands share a bottleneck road, run `simulation.RunDemands`, and print each demand's own total/average plus one overall total/average (FR-006, FR-009; depends on T009)
 
 ### Tests for User Story 3
 
-- [ ] T012 [P] [US3] Automated test in `simulation/demand_test.go` covering SC-002: across 3 distinct multi-demand networks, verify the final assignment is a genuine equilibrium — no agent, from any demand, could unilaterally switch route and strictly improve (depends on T009)
+- [X] T012 [P] [US3] Automated test in `simulation/demand_test.go` covering SC-002: across 3 distinct multi-demand networks, verify the final assignment is a genuine equilibrium — no agent, from any demand, could unilaterally switch route and strictly improve (depends on T009)
 
 ### Validation for User Story 3
 
-- [ ] T013 [US3] Run `go run ./cmd/graphcli` per quickstart.md and confirm the printed per-demand/overall results and a `0` exit code (SC-003; depends on T011)
+- [X] T013 [US3] Run `go run ./cmd/graphcli` per quickstart.md and confirm the printed per-demand/overall results and a `0` exit code (SC-003; depends on T011)
 
 **Checkpoint**: All three user stories are independently functional — roadmap Phase 4 is complete, closing out the simulation engine ahead of Phase 5's frontend.
 
@@ -120,9 +120,9 @@ output and exit code — no browser or UI required.
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T014 [P] Run `gofmt -l .` and `go vet ./...` across `simulation/` and the updated `cmd/graphcli/`; fix any findings
-- [ ] T015 Run the full quickstart.md validation end-to-end (`go test ./...` then `go run ./cmd/graphcli`) (depends on T005, T008, T010, T012, T013)
-- [ ] T016 [P] Add a doc comment to `simulation/demand.go` stating it generalizes feature 003's single-pair congestion to multiple demands sharing one network, and that every agent's reconsideration remains independent regardless of which demand it belongs to (constitution Principle III at multi-commodity scale)
+- [X] T014 [P] Run `gofmt -l .` and `go vet ./...` across `simulation/` and the updated `cmd/graphcli/`; fix any findings
+- [X] T015 Run the full quickstart.md validation end-to-end (`go test ./...` then `go run ./cmd/graphcli`) (depends on T005, T008, T010, T012, T013)
+- [X] T016 [P] Add a doc comment to `simulation/demand.go` stating it generalizes feature 003's single-pair congestion to multiple demands sharing one network, and that every agent's reconsideration remains independent regardless of which demand it belongs to (constitution Principle III at multi-commodity scale)
 
 ---
 

@@ -75,53 +75,76 @@ func routeCost(g *graph.Graph, route agent.Route, volumes map[string]float64) (f
 	return total, nil
 }
 
-// loadIncrementally assigns each of p.Size agents a route in turn, each
+// odPair is one agent's own fixed origin and destination, tagged with
+// which Demand (feature 004) it belongs to. Run (this feature's single
+// fixed pair) and RunDemands (feature 004's several distinct pairs) both
+// build a flat []odPair — one entry per agent — and share the same
+// loadIncrementally/refine core over it; demandIndex is unused (left 0)
+// for Run's single-pair case.
+type odPair struct {
+	origin, destination string
+	demandIndex         int
+}
+
+// loadIncrementally assigns each agent in ods a route in turn, each
 // against the real traffic accumulated by the agents already placed
 // (via marginalVolumes, so the agent being placed counts as its route's
-// +1th user). This is a realistic warm start: agents react to congestion
-// from the very first one, rather than all independently picking the
-// same free-flow shortest route before any volume exists at all
-// (research.md decision #3).
-func loadIncrementally(g *graph.Graph, p Population) ([]agent.Route, map[string]float64, error) {
-	routes := make([]agent.Route, p.Size)
-	volumes := make(map[string]float64)
+// +1th user) — regardless of which agent's own origin/destination that
+// is, so congestion is shared across every distinct pair present in ods
+// (feature 004, FR-002). This is a realistic warm start: agents react to
+// congestion from the very first one, rather than all independently
+// picking the same free-flow shortest route before any volume exists at
+// all (research.md decision #3, feature 003).
+//
+// On failure, failedAt is the index into ods of the agent whose route
+// computation failed (-1 on success).
+func loadIncrementally(g *graph.Graph, ods []odPair) (routes []agent.Route, volumes map[string]float64, failedAt int, err error) {
+	routes = make([]agent.Route, len(ods))
+	volumes = make(map[string]float64)
 
-	for i := 0; i < p.Size; i++ {
-		route, err := agent.ShortestRouteAtVolumes(g, p.Origin, p.Destination, marginalVolumes(g, volumes))
-		if err != nil {
-			return nil, nil, err
+	for i, od := range ods {
+		route, rerr := agent.ShortestRouteAtVolumes(g, od.origin, od.destination, marginalVolumes(g, volumes))
+		if rerr != nil {
+			return nil, nil, i, rerr
 		}
 		routes[i] = route
 		addToVolumes(volumes, route)
 	}
 
-	return routes, volumes, nil
+	return routes, volumes, -1, nil
 }
 
-// refine runs up to p.MaxRounds best-response rounds over routes/volumes,
-// mutating both in place: each round, every agent's current route is
-// compared against the best alternative given everyone else's current
-// choice, and the agent switches only on strict improvement (research.md
-// decision #2 — this is what makes tied routes stable instead of
-// flip-flopping forever). A round with zero switches means the population
-// has reached a stable assignment (guaranteed to happen in finite rounds
-// for this class of game — research.md decision #1) and refinement stops
-// there; otherwise it stops at p.MaxRounds, not yet converged.
-func refine(g *graph.Graph, p Population, routes []agent.Route, volumes map[string]float64) (rounds int, converged bool, err error) {
-	for round := 1; round <= p.MaxRounds; round++ {
+// refine runs up to maxRounds best-response rounds over routes/volumes
+// (each routes[i] belonging to ods[i]'s origin/destination), mutating
+// both in place: each round, every agent's current route is compared
+// against the best alternative given everyone else's current choice —
+// regardless of which pair that agent or any other agent belongs to —
+// and the agent switches only on strict improvement (research.md
+// decision #2, feature 003 — this is what makes tied routes stable
+// instead of flip-flopping forever). A round with zero switches means the
+// whole shared assignment has reached a stable state (guaranteed to
+// happen in finite rounds for this class of game — research.md decision
+// #1, feature 003, which holds regardless of how many distinct pairs are
+// involved) and refinement stops there; otherwise it stops at maxRounds,
+// not yet converged.
+//
+// On failure, failedAt is the index into ods/routes of the agent whose
+// route computation failed (-1 if it instead simply exhausted maxRounds).
+func refine(g *graph.Graph, ods []odPair, maxRounds int, routes []agent.Route, volumes map[string]float64) (rounds int, converged bool, failedAt int, err error) {
+	for round := 1; round <= maxRounds; round++ {
 		changed := false
 
 		for i, route := range routes {
 			currentCost, cerr := routeCost(g, route, volumes)
 			if cerr != nil {
-				return round, false, cerr
+				return round, false, i, cerr
 			}
 
 			removeFromVolumes(volumes, route)
-			alt, aerr := agent.ShortestRouteAtVolumes(g, p.Origin, p.Destination, marginalVolumes(g, volumes))
+			alt, aerr := agent.ShortestRouteAtVolumes(g, ods[i].origin, ods[i].destination, marginalVolumes(g, volumes))
 			if aerr != nil {
 				addToVolumes(volumes, route)
-				return round, false, aerr
+				return round, false, i, aerr
 			}
 
 			if alt.TotalTravelTime < currentCost-epsilon {
@@ -134,11 +157,11 @@ func refine(g *graph.Graph, p Population, routes []agent.Route, volumes map[stri
 		}
 
 		if !changed {
-			return round, true, nil
+			return round, true, -1, nil
 		}
 	}
 
-	return p.MaxRounds, false, nil
+	return maxRounds, false, -1, nil
 }
 
 // Run computes a route assignment for p on g: agents are loaded one at a
@@ -155,12 +178,17 @@ func Run(g *graph.Graph, p Population) (AssignmentResult, error) {
 		return AssignmentResult{Converged: true}, nil
 	}
 
-	routes, volumes, err := loadIncrementally(g, p)
+	ods := make([]odPair, p.Size)
+	for i := range ods {
+		ods[i] = odPair{origin: p.Origin, destination: p.Destination}
+	}
+
+	routes, volumes, _, err := loadIncrementally(g, ods)
 	if err != nil {
 		return AssignmentResult{}, err
 	}
 
-	rounds, converged, err := refine(g, p, routes, volumes)
+	rounds, converged, _, err := refine(g, ods, p.MaxRounds, routes, volumes)
 	if err != nil {
 		return AssignmentResult{}, err
 	}
