@@ -13,10 +13,30 @@ import (
 var ErrNoRoute = errors.New("agent: no route exists")
 
 // ShortestRoute computes the minimum-total-travel-time route from `from`
-// to `to` in g, evaluating every edge's travel time at the given volume
-// via Dijkstra's algorithm (edge weights — travel times at a fixed
-// baseline volume — are assumed non-negative; see research.md decision
-// #4). This phase's only caller, Agent.ComputeRoute, always passes 0.
+// to `to` in g, evaluating every edge's travel time at the same flat
+// baseline volume. This phase-2 behavior is unchanged: it's now a thin
+// wrapper over the shared core in shortestRoute — see
+// ShortestRouteAtVolumes for the per-edge-volume version feature 003's
+// congestion model needs.
+func ShortestRoute(g *graph.Graph, from, to string, volume float64) (Route, error) {
+	return shortestRoute(g, from, to, func(string) float64 { return volume })
+}
+
+// ShortestRouteAtVolumes computes the minimum-total-travel-time route from
+// `from` to `to` in g, evaluating each edge's travel time at its own
+// current traffic volume: volumes[edge.ID], or 0 for any edge not present
+// in volumes. Unlike ShortestRoute's single flat baseline, this lets
+// different roads carry different real traffic simultaneously, which is
+// what feature 003's population-level congestion requires.
+func ShortestRouteAtVolumes(g *graph.Graph, from, to string, volumes map[string]float64) (Route, error) {
+	return shortestRoute(g, from, to, func(id string) float64 { return volumes[id] })
+}
+
+// shortestRoute is the one Dijkstra implementation both ShortestRoute and
+// ShortestRouteAtVolumes delegate to, parameterized by how an edge's
+// current volume is looked up (edge weights — travel times at whatever
+// volume volumeOf reports — are assumed non-negative; see research.md
+// decision #4 of feature 003).
 //
 // Returns a zero-edge, zero-time Route if from == to.
 // Returns an error wrapping ErrNoRoute if no path exists.
@@ -26,7 +46,7 @@ var ErrNoRoute = errors.New("agent: no route exists")
 // Parallel edges between the same node pair are each considered as a
 // distinct option, since adjacency is built from every edge in the graph
 // without deduplicating by (From, To).
-func ShortestRoute(g *graph.Graph, from, to string, volume float64) (Route, error) {
+func shortestRoute(g *graph.Graph, from, to string, volumeOf func(edgeID string) float64) (Route, error) {
 	if from == to {
 		return Route{}, nil
 	}
@@ -54,7 +74,7 @@ func ShortestRoute(g *graph.Graph, from, to string, volume float64) (Route, erro
 		}
 
 		for _, e := range adjacency[current.node] {
-			tt, err := g.TravelTime(e.ID, volume)
+			tt, err := g.TravelTime(e.ID, volumeOf(e.ID))
 			if err != nil {
 				return Route{}, fmt.Errorf("agent: computing travel time for edge %q: %w", e.ID, err)
 			}

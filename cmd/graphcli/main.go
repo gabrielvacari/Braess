@@ -11,6 +11,7 @@ import (
 
 	"braess/agent"
 	"braess/graph"
+	"braess/simulation"
 )
 
 // fixedOrigin and fixedDestination are this roadmap phase's one
@@ -37,7 +38,11 @@ func run() error {
 
 	printNodes(g)
 	printEdges(g)
-	return printAgentRoutes(g)
+	if err := printAgentRoutes(g); err != nil {
+		return err
+	}
+
+	return printBraessParadox()
 }
 
 // printAgentRoutes constructs several independent agents for the fixed
@@ -60,6 +65,95 @@ func printAgentRoutes(g *graph.Graph) error {
 		fmt.Printf(" (total_travel_time=%g)\n", route.TotalTravelTime)
 	}
 	return nil
+}
+
+// braessAgentCount matches the textbook Braess's Paradox example (4000
+// drivers), so the printed result below reproduces its well-known numbers
+// exactly (spec 003-congestion-braess-paradox, research.md decision #6).
+const braessAgentCount = 4000
+
+// printBraessParadox runs the classic four-node Braess's Paradox network
+// twice — once without its extra connecting road, once with it — and
+// prints both results plus an explicit comparison. This is the roadmap's
+// pre-frontend validation gate (AGENTS.md, constitution Principle II):
+// proving in text, before any UI exists, that adding a road can make a
+// selfishly-routed network worse for everyone.
+func printBraessParadox() error {
+	population := simulation.Population{
+		Origin:      "S",
+		Destination: "T",
+		Size:        braessAgentCount,
+		MaxRounds:   simulation.DefaultMaxRounds,
+	}
+
+	fmt.Println("Braess's Paradox (classic four-node network, 4000 agents):")
+
+	without, err := braessNetwork(false)
+	if err != nil {
+		return fmt.Errorf("building Braess network without shortcut: %w", err)
+	}
+	resultWithout, err := simulation.Run(without, population)
+	if err != nil {
+		return fmt.Errorf("running population without shortcut: %w", err)
+	}
+	fmt.Printf("  without the extra road: converged=%t rounds=%d total=%g average=%g\n",
+		resultWithout.Converged, resultWithout.Rounds, resultWithout.TotalTravelTime, resultWithout.AverageTravelTime)
+
+	with, err := braessNetwork(true)
+	if err != nil {
+		return fmt.Errorf("building Braess network with shortcut: %w", err)
+	}
+	resultWith, err := simulation.Run(with, population)
+	if err != nil {
+		return fmt.Errorf("running population with shortcut: %w", err)
+	}
+	fmt.Printf("  with the extra road:    converged=%t rounds=%d total=%g average=%g\n",
+		resultWith.Converged, resultWith.Rounds, resultWith.TotalTravelTime, resultWith.AverageTravelTime)
+
+	if resultWith.AverageTravelTime > resultWithout.AverageTravelTime {
+		fmt.Printf("  => adding the road made the average trip WORSE (%g -> %g) — Braess's Paradox\n",
+			resultWithout.AverageTravelTime, resultWith.AverageTravelTime)
+	} else {
+		fmt.Printf("  => adding the road did not make things worse here (%g -> %g)\n",
+			resultWithout.AverageTravelTime, resultWith.AverageTravelTime)
+	}
+	return nil
+}
+
+// braessNetwork builds the classic four-node Braess's Paradox network:
+// S -> A and B -> T are congestible (time = volume/100); S -> B and
+// A -> T are constant at 45. withShortcut adds the free A -> B edge that
+// is the source of the paradox.
+func braessNetwork(withShortcut bool) (*graph.Graph, error) {
+	g := graph.New()
+	for _, id := range []string{"S", "A", "B", "T"} {
+		if _, err := g.AddNode(id, graph.Intersection); err != nil {
+			return nil, err
+		}
+	}
+
+	edges := []struct {
+		id, from, to string
+		tt           graph.TravelTimeFunc
+	}{
+		{"S-A", "S", "A", graph.Linear(0, 0.01)},
+		{"S-B", "S", "B", graph.Constant(45)},
+		{"A-T", "A", "T", graph.Constant(45)},
+		{"B-T", "B", "T", graph.Linear(0, 0.01)},
+	}
+	for _, e := range edges {
+		if _, err := g.AddEdge(e.id, e.from, e.to, 0, 0, e.tt); err != nil {
+			return nil, err
+		}
+	}
+
+	if withShortcut {
+		if _, err := g.AddEdge("A-B", "A", "B", 0, 0, graph.Constant(0)); err != nil {
+			return nil, err
+		}
+	}
+
+	return g, nil
 }
 
 // sampleNetwork builds a small network mixing every NodeType and both
